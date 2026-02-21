@@ -68,7 +68,7 @@
 
 #if LV_USE_STDLIB_MALLOC == LV_STDLIB_BUILTIN
     /** Size of memory available for `lv_malloc()` in bytes (>= 2kB) */
-    #define LV_MEM_SIZE (192 * 1024U)
+    #define LV_MEM_SIZE (256 * 1024U)
 
     /** Size of the memory expand for `lv_malloc()` in bytes */
     #define LV_MEM_POOL_EXPAND_SIZE 0
@@ -229,7 +229,7 @@
 #endif
 
 /*Use TSi's aka (Think Silicon) NemaGFX */
-#define LV_USE_NEMA_GFX 1
+#define LV_USE_NEMA_GFX 0
 
 #if LV_USE_NEMA_GFX
     /** Select which NemaGFX static library headers to use. Possible options:
@@ -258,10 +258,10 @@
     #endif
 
     /*Enable Vector Graphics Operations. Available only if NemaVG library is present*/
-    #define LV_USE_NEMA_VG 1
+    #define LV_USE_NEMA_VG 0
     #if LV_USE_NEMA_VG
         /*Define application's resolution used for VG related buffer allocation */
-        #define LV_NEMA_GFX_MAX_RESX 800
+        #define LV_NEMA_GFX_MAX_RESX 480
         #define LV_NEMA_GFX_MAX_RESY 480
     #endif
 #endif
@@ -392,14 +392,14 @@
 #endif
 
 /** Accelerate blends, fills, etc. with STM32 DMA2D */
-#define LV_USE_DRAW_DMA2D 0
+#define LV_USE_DRAW_DMA2D 1
 #if LV_USE_DRAW_DMA2D
-    #define LV_DRAW_DMA2D_HAL_INCLUDE "stm32h7xx_hal.h"
+    #define LV_DRAW_DMA2D_HAL_INCLUDE "stm32u5xx_hal.h"
 
     /* if enabled, the user is required to call `lv_draw_dma2d_transfer_complete_interrupt_handler`
      * upon receiving the DMA2D global interrupt
      */
-    #define LV_USE_DRAW_DMA2D_INTERRUPT 0
+    #define LV_USE_DRAW_DMA2D_INTERRUPT 1
 #endif
 
 /** Draw using cached OpenGLES textures. Requires LV_USE_OPENGLES */
@@ -1406,7 +1406,7 @@
 #define LV_USE_ST_LTDC    1
 #if LV_USE_ST_LTDC
     /* Only used for partial. */
-    #define LV_ST_LTDC_USE_DMA2D_FLUSH 1
+    #define LV_ST_LTDC_USE_DMA2D_FLUSH 0
 #endif
 
 /** Driver for NXP ELCDIF */

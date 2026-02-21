@@ -22,6 +22,7 @@
 #include "stm32u5xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "lvgl/lvgl.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,7 +57,7 @@
 
 /* External variables --------------------------------------------------------*/
 extern DMA2D_HandleTypeDef hdma2d;
-extern GPU2D_HandleTypeDef hgpu2d;
+extern DSI_HandleTypeDef hdsi;
 extern XSPI_HandleTypeDef hxspi1;
 extern DMA_HandleTypeDef handle_GPDMA1_Channel1;
 extern DMA_HandleTypeDef handle_GPDMA1_Channel0;
@@ -207,17 +208,11 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
-  * @brief This function handles EXTI Line5 interrupt.
+  * @brief This function handles EXTI Line8 interrupt.
   */
-void EXTI5_IRQHandler(void)
+void EXTI8_IRQHandler(void)
 {
-  /* USER CODE BEGIN EXTI5_IRQn 0 */
-
-  /* USER CODE END EXTI5_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(TP_IRQ_Pin);
-  /* USER CODE BEGIN EXTI5_IRQn 1 */
-
-  /* USER CODE END EXTI5_IRQn 1 */
 }
 
 /**
@@ -267,13 +262,8 @@ void TIM6_IRQHandler(void)
   */
 void DMA2D_IRQHandler(void)
 {
-  /* USER CODE BEGIN DMA2D_IRQn 0 */
-
-  /* USER CODE END DMA2D_IRQn 0 */
   HAL_DMA2D_IRQHandler(&hdma2d);
-  /* USER CODE BEGIN DMA2D_IRQn 1 */
-
-  /* USER CODE END DMA2D_IRQn 1 */
+  lv_draw_dma2d_transfer_complete_interrupt_handler();
 }
 
 /**
@@ -291,31 +281,11 @@ void HSPI1_IRQHandler(void)
 }
 
 /**
-  * @brief This function handles GPU2D global interrupt.
+  * @brief This function handles DSI global interrupt.
   */
-void GPU2D_IRQHandler(void)
+void DSI_IRQHandler(void)
 {
-  /* USER CODE BEGIN GPU2D_IRQn 0 */
-
-  /* USER CODE END GPU2D_IRQn 0 */
-  HAL_GPU2D_IRQHandler(&hgpu2d);
-  /* USER CODE BEGIN GPU2D_IRQn 1 */
-
-  /* USER CODE END GPU2D_IRQn 1 */
-}
-
-/**
-  * @brief This function handles GPU2D Error interrupt.
-  */
-void GPU2D_ER_IRQHandler(void)
-{
-  /* USER CODE BEGIN GPU2D_ER_IRQn 0 */
-
-  /* USER CODE END GPU2D_ER_IRQn 0 */
-  HAL_GPU2D_ER_IRQHandler(&hgpu2d);
-  /* USER CODE BEGIN GPU2D_ER_IRQn 1 */
-
-  /* USER CODE END GPU2D_ER_IRQn 1 */
+  HAL_DSI_IRQHandler(&hdsi);
 }
 
 /**
