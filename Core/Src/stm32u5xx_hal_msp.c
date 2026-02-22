@@ -250,10 +250,27 @@ void HAL_DSI_MspInit(DSI_HandleTypeDef* hdsi)
 {
   if(hdsi->Instance==DSI)
   {
+    RCC_PeriphCLKInitTypeDef PLL3InitPeriph = {0};
+
+    /* Configure PLL3 as initial DSI clock source (before DSI PLL locks) */
+    /* HSE=16MHz, M=4 -> 4MHz, N=125 -> 500MHz VCO, P=8 -> 62.5MHz DSI byte clock */
+    PLL3InitPeriph.PeriphClockSelection = RCC_PERIPHCLK_DSI;
+    PLL3InitPeriph.DsiClockSelection = RCC_DSICLKSOURCE_PLL3;
+    PLL3InitPeriph.PLL3.PLL3Source = RCC_PLLSOURCE_HSE;
+    PLL3InitPeriph.PLL3.PLL3M = 4;
+    PLL3InitPeriph.PLL3.PLL3N = 125;
+    PLL3InitPeriph.PLL3.PLL3P = 8;
+    PLL3InitPeriph.PLL3.PLL3Q = 8;
+    PLL3InitPeriph.PLL3.PLL3R = 24;
+    PLL3InitPeriph.PLL3.PLL3FRACN = 0;
+    PLL3InitPeriph.PLL3.PLL3RGE = RCC_PLLVCIRANGE_1;
+    PLL3InitPeriph.PLL3.PLL3ClockOut = RCC_PLL3_DIVR | RCC_PLL3_DIVP;
+    (void)HAL_RCCEx_PeriphCLKConfig(&PLL3InitPeriph);
+
     /* Peripheral clock enable */
     __HAL_RCC_DSI_CLK_ENABLE();
     /* DSI interrupt Init */
-    HAL_NVIC_SetPriority(DSI_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(DSI_IRQn, 0x0F, 0);
     HAL_NVIC_EnableIRQ(DSI_IRQn);
   }
 
@@ -598,11 +615,11 @@ void HAL_LTDC_MspInit(LTDC_HandleTypeDef* hltdc)
     PeriphClkInit.PLL3.PLL3M = 4;
     PeriphClkInit.PLL3.PLL3N = 125;
     PeriphClkInit.PLL3.PLL3P = 8;
-    PeriphClkInit.PLL3.PLL3Q = 2;
-    PeriphClkInit.PLL3.PLL3R = 20;
-    PeriphClkInit.PLL3.PLL3RGE = RCC_PLLVCIRANGE_0;
+    PeriphClkInit.PLL3.PLL3Q = 8;
+    PeriphClkInit.PLL3.PLL3R = 24;
+    PeriphClkInit.PLL3.PLL3RGE = RCC_PLLVCIRANGE_1;
     PeriphClkInit.PLL3.PLL3FRACN = 0;
-    PeriphClkInit.PLL3.PLL3ClockOut = RCC_PLL3_DIVR;
+    PeriphClkInit.PLL3.PLL3ClockOut = RCC_PLL3_DIVR | RCC_PLL3_DIVP;
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
     {
       Error_Handler();

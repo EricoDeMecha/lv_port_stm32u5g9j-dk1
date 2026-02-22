@@ -79,6 +79,7 @@ static void MX_DCACHE1_Init(void);
 static void MX_DCACHE2_Init(void);
 static void MX_CRC_Init(void);
 static void MX_DSIHOST_DSI_Init(void);
+static void MX_DSIHOST_DSI_PreLTDC_Init(void);
 static void MX_LTDC_Init(void);
 static void MX_DMA2D_Init(void);
 static void MX_HSPI1_Init(void);
@@ -132,6 +133,7 @@ int main(void)
   MX_DCACHE2_Init();
   MX_CRC_Init();
   MX_DSIHOST_DSI_Init();
+  MX_DSIHOST_DSI_PreLTDC_Init();
   MX_LTDC_Init();
   HAL_DSI_Start(&hdsi);
   LCD_Panel_Init();
@@ -395,7 +397,6 @@ static void MX_DSIHOST_DSI_Init(void)
 {
   DSI_PLLInitTypeDef PLLInit = {0};
   DSI_VidCfgTypeDef VidCfg = {0};
-  DSI_PHY_TimerTypeDef PhyTimings = {0};
 
   hdsi.Instance = DSI;
   hdsi.Init.AutomaticClockLaneControl = DSI_AUTO_CLK_LANE_CTRL_DISABLE;
@@ -417,6 +418,12 @@ static void MX_DSIHOST_DSI_Init(void)
     Error_Handler();
   }
 
+  /* Set generic virtual channel ID for DCS commands */
+  if (HAL_DSI_SetGenericVCID(&hdsi, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
   /* DSI Video Mode Configuration - burst mode, RGB565 */
   /* BSP timing: HSYNC=2, HBP=1, HFP=1, HACT=480, VSYNC=1, VBP=12, VFP=50, VACT=481 */
   VidCfg.VirtualChannelID = 0;
@@ -429,7 +436,7 @@ static void MX_DSIHOST_DSI_Init(void)
   VidCfg.HSPolarity = DSI_HSYNC_ACTIVE_HIGH;
   VidCfg.VSPolarity = DSI_VSYNC_ACTIVE_HIGH;
   VidCfg.DEPolarity = DSI_DATA_ENABLE_ACTIVE_HIGH;
-  /* Timing in lane byte clocks (*2 for RGB565 bytes-per-pixel) */
+  /* Timing in lane byte clocks (*2 for RGB565 = 2 bytes-per-pixel) */
   VidCfg.HorizontalSyncActive = 2 * 2;
   VidCfg.HorizontalBackPorch = 1 * 2;
   VidCfg.HorizontalLine = (480 + 2 + 1 + 1) * 2;
@@ -439,7 +446,7 @@ static void MX_DSIHOST_DSI_Init(void)
   VidCfg.VerticalActive = 481;
   VidCfg.LPCommandEnable = DSI_LP_COMMAND_ENABLE;
   VidCfg.LPLargestPacketSize = 64;
-  VidCfg.LPVACTLargestPacketSize = 64;
+  VidCfg.LPVACTLargestPacketSize = 0;
   VidCfg.LPHorizontalFrontPorchEnable = DSI_LP_HFP_ENABLE;
   VidCfg.LPHorizontalBackPorchEnable = DSI_LP_HBP_ENABLE;
   VidCfg.LPVerticalActiveEnable = DSI_LP_VACT_ENABLE;
@@ -453,7 +460,24 @@ static void MX_DSIHOST_DSI_Init(void)
     Error_Handler();
   }
 
+  /* Configure DSI clock source to DSI PHY PLL (must be done before LTDC init) */
+  RCC_PeriphCLKInitTypeDef DSIPHYInitPeriph = {0};
+  DSIPHYInitPeriph.PeriphClockSelection = RCC_PERIPHCLK_DSI;
+  DSIPHYInitPeriph.DsiClockSelection = RCC_DSICLKSOURCE_DSIPHY;
+  if (HAL_RCCEx_PeriphCLKConfig(&DSIPHYInitPeriph) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief  Configure DSI PHY timers, host timeouts, flow control.
+  *         Must be called after LTDC init, before HAL_DSI_Start.
+  */
+static void MX_DSIHOST_DSI_PreLTDC_Init(void)
+{
   /* PHY Timings (from STM32CubeU5 BSP) */
+  DSI_PHY_TimerTypeDef PhyTimings = {0};
   PhyTimings.ClockLaneHS2LPTime = 11;
   PhyTimings.ClockLaneLP2HSTime = 40;
   PhyTimings.DataLaneHS2LPTime = 12;
@@ -464,6 +488,31 @@ static void MX_DSIHOST_DSI_Init(void)
   {
     Error_Handler();
   }
+
+  /* Host Timeouts (from STM32CubeU5 BSP - all zeros) */
+  DSI_HOST_TimeoutTypeDef HostTimeouts = {0};
+  HostTimeouts.TimeoutCkdiv = 1;
+  HostTimeouts.HighSpeedTransmissionTimeout = 0;
+  HostTimeouts.LowPowerReceptionTimeout = 0;
+  HostTimeouts.HighSpeedReadTimeout = 0;
+  HostTimeouts.LowPowerReadTimeout = 0;
+  HostTimeouts.HighSpeedWriteTimeout = 0;
+  HostTimeouts.HighSpeedWritePrespMode = 0;
+  HostTimeouts.LowPowerWriteTimeout = 0;
+  HostTimeouts.BTATimeout = 0;
+  if (HAL_DSI_ConfigHostTimeouts(&hdsi, &HostTimeouts) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /* Enable BTA flow control */
+  if (HAL_DSI_ConfigFlowControl(&hdsi, DSI_FLOW_CONTROL_BTA) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /* Enable DSI wrapper before LTDC init (required by BSP sequence) */
+  __HAL_DSI_ENABLE(&hdsi);
 }
 
 /**
@@ -641,8 +690,8 @@ static void MX_LTDC_Init(void)
   }
   pLayerCfg.WindowX0 = 0;
   pLayerCfg.WindowX1 = 480;
-  pLayerCfg.WindowY0 = 0;
-  pLayerCfg.WindowY1 = 480;
+  pLayerCfg.WindowY0 = 1;
+  pLayerCfg.WindowY1 = 481;
   pLayerCfg.PixelFormat = LTDC_PIXEL_FORMAT_RGB565;
   pLayerCfg.Alpha = 255;
   pLayerCfg.Alpha0 = 0;
@@ -699,7 +748,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : LCD_RESET_Pin */
   GPIO_InitStruct.Pin = LCD_RESET_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LCD_RESET_GPIO_Port, &GPIO_InitStruct);
 
