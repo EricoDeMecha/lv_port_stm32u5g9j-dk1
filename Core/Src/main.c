@@ -733,7 +733,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level - LCD Reset low initially */
   HAL_GPIO_WritePin(LCD_RESET_GPIO_Port, LCD_RESET_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level - Backlight off initially */
+  /*Configure GPIO pin Output Level - PE6 LOW → adapter MOSFET OFF → VCI_EN HIGH (power on) */
   HAL_GPIO_WritePin(LCD_BL_CTRL_GPIO_Port, LCD_BL_CTRL_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
@@ -794,13 +794,15 @@ static void MX_GPIO_Init(void)
 
 /**
   * @brief  CO5300 AMOLED panel initialization via DSI DCS commands.
-  *         PD5 serves as VCI_EN (power enable, active HIGH) on the adapter board.
+  *         PD5 = DSI_RESETn (display reset, active LOW) via adapter board.
   *         DSI must be started before sending any DCS commands.
   * @retval None
   */
 static void LCD_Panel_Init(void)
 {
-  /* Power cycle: PD5 = VCI_EN on the CO5300 adapter board */
+  /* Hardware reset: PD5 = DSI_RESETn on the adapter board (active LOW).
+   * VCI_EN is controlled by PE6 (LCD_BL_CTRL) through an inverting MOSFET —
+   * PE6=LOW (default) → Q1 OFF → VCI_EN pulled HIGH via R17 → power ON. */
   HAL_GPIO_WritePin(LCD_RESET_GPIO_Port, LCD_RESET_Pin, GPIO_PIN_RESET);
   HAL_Delay(20);
   HAL_GPIO_WritePin(LCD_RESET_GPIO_Port, LCD_RESET_Pin, GPIO_PIN_SET);
@@ -841,8 +843,8 @@ static void LCD_Panel_Init(void)
   /* Contrast/saturation control (from manufacturer reference) */
   HAL_DSI_ShortWrite(&hdsi, 0, DSI_DCS_SHORT_PKT_WRITE_P1, 0x63, 0xFF);
 
-  /* Column address set: 0 to 465 (466 pixels) */
-  uint8_t col_addr[4] = {0x00, 0x00, 0x01, 0xD1};
+  /* Column address set: 6 to 471 (466 pixels, 6-pixel offset in CO5300 RAM) */
+  uint8_t col_addr[4] = {0x00, 0x06, 0x01, 0xD7};
   HAL_DSI_LongWrite(&hdsi, 0, DSI_DCS_LONG_PKT_WRITE, 4, 0x2A, col_addr);
 
   /* Row address set: 0 to 465 (466 pixels) */
