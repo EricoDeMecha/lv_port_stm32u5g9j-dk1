@@ -804,9 +804,9 @@ static void LCD_Panel_Init(void)
    * VCI_EN is controlled by PE6 (LCD_BL_CTRL) through an inverting MOSFET —
    * PE6=LOW (default) → Q1 OFF → VCI_EN pulled HIGH via R17 → power ON. */
   HAL_GPIO_WritePin(LCD_RESET_GPIO_Port, LCD_RESET_Pin, GPIO_PIN_RESET);
-  HAL_Delay(20);
+  HAL_Delay(100);
   HAL_GPIO_WritePin(LCD_RESET_GPIO_Port, LCD_RESET_Pin, GPIO_PIN_SET);
-  HAL_Delay(150);
+  HAL_Delay(120);
 
   /* Start DSI — required before any DCS commands */
   if (HAL_DSI_Start(&hdsi) != HAL_OK)
@@ -818,10 +818,18 @@ static void LCD_Panel_Init(void)
   HAL_DSI_ShortWrite(&hdsi, 0, DSI_DCS_SHORT_PKT_WRITE_P0, 0x01, 0x00);
   HAL_Delay(120);
 
-  /* CO5300 vendor page 0x20: timing/bias configuration */
+  /* VREFP voltage reference (from Infineon CO5300 driver) */
+  HAL_DSI_ShortWrite(&hdsi, 0, DSI_DCS_SHORT_PKT_WRITE_P1, 0x31, 0x08);
+
+  /* CO5300 vendor page 0x20: OTP checksum validation */
   HAL_DSI_ShortWrite(&hdsi, 0, DSI_DCS_SHORT_PKT_WRITE_P1, 0xFE, 0x20);
   HAL_DSI_ShortWrite(&hdsi, 0, DSI_DCS_SHORT_PKT_WRITE_P1, 0xF4, 0x5A);
   HAL_DSI_ShortWrite(&hdsi, 0, DSI_DCS_SHORT_PKT_WRITE_P1, 0xF5, 0x59);
+
+  /* CO5300 vendor page 0x80: OLED IP — DSI lane selection
+   * 0x00 = 1 data lane, 0x01 = 2 data lanes */
+  HAL_DSI_ShortWrite(&hdsi, 0, DSI_DCS_SHORT_PKT_WRITE_P1, 0xFE, 0x80);
+  HAL_DSI_ShortWrite(&hdsi, 0, DSI_DCS_SHORT_PKT_WRITE_P1, 0x03, 0x00);
 
   /* CO5300 vendor page 0x40: VCOM/power configuration */
   HAL_DSI_ShortWrite(&hdsi, 0, DSI_DCS_SHORT_PKT_WRITE_P1, 0xFE, 0x40);
@@ -833,7 +841,7 @@ static void LCD_Panel_Init(void)
   /* Pixel format: RGB565 (0x55) */
   HAL_DSI_ShortWrite(&hdsi, 0, DSI_DCS_SHORT_PKT_WRITE_P1, 0x3A, 0x55);
 
-  /* Tearing effect line OFF */
+  /* Tearing effect line ON (V-Blank only) */
   HAL_DSI_ShortWrite(&hdsi, 0, DSI_DCS_SHORT_PKT_WRITE_P1, 0x35, 0x00);
 
   /* AMOLED backlight: enable controller, set brightness to max */
@@ -857,7 +865,7 @@ static void LCD_Panel_Init(void)
 
   /* Display On */
   HAL_DSI_ShortWrite(&hdsi, 0, DSI_DCS_SHORT_PKT_WRITE_P0, 0x29, 0x00);
-  HAL_Delay(20);
+  HAL_Delay(30);
 }
 
 /* USER CODE END 4 */
