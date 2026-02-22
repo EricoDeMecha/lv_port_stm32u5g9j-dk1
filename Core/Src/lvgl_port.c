@@ -6,6 +6,7 @@
 #include "lvgl/lvgl.h"
 #include "stm32u5xx_hal.h"
 #include "main.h"
+#include "cst820.h"
 
 extern I2C_HandleTypeDef hi2c5;
 
@@ -13,9 +14,9 @@ extern I2C_HandleTypeDef hi2c5;
  *      DEFINES
  *********************/
 
-/**********************
- *      TYPEDEFS
- **********************/
+#define DISP_WIDTH   466
+#define DISP_HEIGHT  466
+#define DISP_BPP     2    /* RGB565 = 2 bytes per pixel */
 
 /**********************
  *  STATIC PROTOTYPES
@@ -29,10 +30,7 @@ void touch_read(lv_indev_t * indev, lv_indev_data_t * data);
 
 static volatile bool do_sample_touch = false;
 static lv_indev_state_t last_state = LV_INDEV_STATE_RELEASED;
-
-/**********************
- *      MACROS
- **********************/
+static CST820_HandleTypeDef hcst;
 
 /**********************
  *   GLOBAL FUNCTIONS
@@ -44,14 +42,21 @@ void lvgl_port_init(void)
 
     lv_tick_set_cb(HAL_GetTick);
 
-#if 1
-    static __attribute__((aligned(32))) uint8_t buf_direct_2[480 * 480 * 2];
+    /* CST820 touch controller on I2C5.
+     * No dedicated touch reset pin on the DK1 adapter board —
+     * the CST820 gets power-on reset from the VCI_EN power cycle. */
+    hcst.hi2c = &hi2c5;
+    hcst.rst_port = NULL;
+    hcst.rst_pin = 0;
+    hcst.int_port = TP_IRQ_GPIO_Port;
+    hcst.int_pin = TP_IRQ_Pin;
+    CST820_Init(&hcst);
+
+    /* Direct double-buffered rendering:
+     * Buffer A = LTDC framebuffer at 0x20000000 (RAM2)
+     * Buffer B = static array (placed by linker in RAM) */
+    static __attribute__((aligned(32))) uint8_t buf_direct_2[DISP_WIDTH * DISP_HEIGHT * DISP_BPP];
     lv_st_ltdc_create_direct((void *)0x20000000, buf_direct_2, 0);
-#else
-    static __attribute__((aligned(32))) uint8_t buf_partial_1[480 * 480];
-    static __attribute__((aligned(32))) uint8_t buf_partial_2[480 * 480];
-    lv_st_ltdc_create_partial(buf_partial_1, buf_partial_2, 480 * 480, 0);
-#endif
 
     lv_indev_t * indev = lv_indev_create();
     lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
@@ -73,33 +78,26 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 void touch_read(lv_indev_t * indev, lv_indev_data_t * data)
 {
     NVIC_DisableIRQ(EXTI8_IRQn);
+
     if (do_sample_touch)
     {
-        uint8_t touches = 0;
-        uint8_t buf[6];
-        const uint16_t STATUS_REG = 0x814E;
-        const uint16_t TOUCH_POS_REG = 0x8150;
-        uint8_t ZERO = 0;
-
-        HAL_I2C_Mem_Read(&hi2c5, 0xBA, STATUS_REG, 2, buf, 1, HAL_MAX_DELAY);
-        touches = (0x0F & buf[0]);
-
-        HAL_I2C_Mem_Write(&hi2c5, 0xBA, STATUS_REG, 2, &ZERO, 1, HAL_MAX_DELAY);
-
         do_sample_touch = false;
 
-        if (touches > 0)
+        uint16_t x, y;
+        uint8_t gesture;
+
+        if (CST820_GetTouch(&hcst, &x, &y, &gesture))
         {
             last_state = LV_INDEV_STATE_PRESSED;
-
-            HAL_I2C_Mem_Read(&hi2c5, 0xBA, TOUCH_POS_REG, 2, buf, 4, HAL_MAX_DELAY);
-            data->point.x = buf[0] + (buf[1] << 8);
-            data->point.y = buf[2] + (buf[3] << 8);
+            data->point.x = x;
+            data->point.y = y;
         }
-        else {
+        else
+        {
             last_state = LV_INDEV_STATE_RELEASED;
         }
     }
+
     NVIC_EnableIRQ(EXTI8_IRQn);
 
     data->state = last_state;
